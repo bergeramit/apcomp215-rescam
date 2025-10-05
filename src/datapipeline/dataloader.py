@@ -7,7 +7,7 @@ def get_raw_files_local() -> list[str]:
     Returns:
         list[str]: List of local file names
     """
-    storage_client = storage.Client()
+    storage_client = storage.Client(project='rescam-dataset-bucket')
     bucket = storage_client.get_bucket('rescam-dataset-bucket')
     folder = bucket.list_blobs(prefix='raw-datasets/')
     print(f"Files in the folder: {folder}")
@@ -26,7 +26,7 @@ def get_raw_files_local() -> list[str]:
 
 def upload_processed_files(processed_dataset_path: str):
     print(f"Uploading {processed_dataset_path} to GCS bucket")
-    storage_client = storage.Client()
+    storage_client = storage.Client(project='rescam-dataset-bucket')
     bucket = storage_client.get_bucket('rescam-dataset-bucket')
     blob = bucket.blob(os.path.join('processed-dataset', os.path.basename(processed_dataset_path)))
     blob.upload_from_filename(processed_dataset_path)

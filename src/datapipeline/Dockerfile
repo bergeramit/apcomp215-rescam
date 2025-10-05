@@ -1,5 +1,15 @@
 # Use the specified base image
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
+
+# Python wants UTF-8 locale
+ENV LANG=C.UTF-8
+
+# Tell Python to disable buffering so we don't lose any logs.
+ENV PYTHONUNBUFFERED=1
+
+# Tell uv to copy packages from the wheel into the site-packages
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT=/home/app/.venv
 
 # Update package lists and install required system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,12 +35,21 @@ ENV PATH="/home/app/.local/bin:$PATH"
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv sync
 
 # Set environment variables
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/home/app/.venv/bin:$PATH"
 
 # Copy the content of the local src directory to the working directory
-COPY --chown=app:app dataloader.py .
 COPY --chown=app:app preprocess_clean.py .
+COPY --chown=app:app dataloader.py .
+
+# Create the gcloud config directory
+RUN mkdir -p /home/app/.config/gcloud
+
+# Copy Google Cloud credentials
+COPY --chown=app:app secrets/application_default_credentials.json /home/app/.config/gcloud/
+
+# Set environment variable for Google Application Credentials
+ENV GOOGLE_APPLICATION_CREDENTIALS="/home/app/.config/gcloud/application_default_credentials.json"
 
 # Set the entrypoint and default command
 ENTRYPOINT ["/bin/bash"]
-CMD ["-c", "source /app/.venv/bin/activate && exec bash"]
+CMD ["-c", "source /home/app/.venv/bin/activate && /bin/bash"]
