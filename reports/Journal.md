@@ -14,3 +14,5 @@ gcloud config set project 1097076476714 # --> Project ID
 gcloud auth application-default set-quota-project 1097076476714 # --> Project ID
 ```
 This created the files in [/Users/amitberger/.config/gcloud/application_default_credentials.json] and [/Users/amitberger/.config/gcloud/config.yaml]
+
+Find out that Parquet is the best format for storing data in this case, as it is the most compact and efficient format for storing data in a tabular format.
