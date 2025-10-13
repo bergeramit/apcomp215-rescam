@@ -8,9 +8,9 @@ import pandas as pd
 
 # Configuration
 PROJECT_ID = "1097076476714"
-REGION = "us-central1"
-ENDPOINT_ID = None  # TODO: Get this from Vertex AI Console after deployment
-INDEX_ENDPOINT_NAME = None  # Format: projects/{project}/locations/{region}/indexEndpoints/{endpoint_id}
+REGION = "us-east1"
+ENDPOINT_ID = 3044332193032699904  # TODO: Get this from Vertex AI Console after deployment
+INDEX_ENDPOINT_NAME = f"projects/{PROJECT_ID}/locations/{REGION}/indexEndpoints/{ENDPOINT_ID}"
 
 
 def query_similar_emails(query_text, endpoint_name, num_neighbors=5):
@@ -45,7 +45,7 @@ def query_similar_emails(query_text, endpoint_name, num_neighbors=5):
     # Query the index
     print(f"   Searching for {num_neighbors} similar emails...")
     response = endpoint.find_neighbors(
-        deployed_index_id="phishing_emails_deployed",
+        deployed_index_id="phishing_emails_deployed_1760372787396",
         queries=[query_embedding.tolist()],
         num_neighbors=num_neighbors,
     )
