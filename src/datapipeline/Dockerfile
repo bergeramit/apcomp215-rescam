@@ -39,10 +39,21 @@ ENV PATH="/home/app/.venv/bin:$PATH"
 
 # Copy the content of the local src directory to the working directory
 COPY --chown=app:app preprocess_clean.py .
+COPY --chown=app:app preprocess_rag.py .
 COPY --chown=app:app dataloader.py .
+COPY --chown=app:app upload_fake_data.py .
+COPY --chown=app:app generate_fake_emails.py .
+COPY --chown=app:app query_vertex_ai.py .
+COPY --chown=app:app test_embeddings_local.py .
 
-# Create the gcloud config directory
-RUN mkdir -p /home/app/.config/gcloud
+# Note: raw-datasets/ is git-ignored (test data only)
+# Uncomment if you need to include test data in container:
+# COPY --chown=app:app raw-datasets/ ./raw-datasets/
+
+# Create the gcloud config directory and HuggingFace cache directory
+RUN mkdir -p /home/app/.config/gcloud && \
+    mkdir -p /home/app/.cache/huggingface && \
+    chown -R app:app /home/app/.cache
 
 # Copy Google Cloud credentials
 COPY --chown=app:app secrets/application_default_credentials.json /home/app/.config/gcloud/

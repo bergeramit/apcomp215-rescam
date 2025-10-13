@@ -21,6 +21,7 @@ def create_complete_rows(file):
                     'body': row_dict.get('body', ''),
                     'label': int(row_dict['label']),
                     'urls': row_dict.get('urls', ''),
+                    'spam_flag': int(row_dict.get('spam_flag', '0')),
                     'original_db': os.path.basename(file)
                 }
                 result.append(result_row)
