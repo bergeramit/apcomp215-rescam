@@ -6,10 +6,12 @@ set -e
 # Define some environment variables
 export IMAGE_NAME="ml-model"
 export BASE_DIR=$(pwd)
+export PROJECT_ROOT="$(cd ../../ && pwd)"
 
-# Build the image based on the Dockerfile
-docker build -t $IMAGE_NAME -f Dockerfile .
-#docker build -t $IMAGE_NAME --platform=linux/amd64 -f Dockerfile .
+# Change to project root and build
+cd "$PROJECT_ROOT"
+docker build -t $IMAGE_NAME -f src/models/Dockerfile .
+#docker build -t $IMAGE_NAME --platform=linux/amd64 -f src/models/Dockerfile .
 
 # Run the container
 docker run --rm --name $IMAGE_NAME -ti $IMAGE_NAME

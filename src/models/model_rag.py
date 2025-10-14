@@ -202,7 +202,7 @@ def read_email_from_gcs(bucket_name: str, file_name: str) -> str:
     """Reads the content of an email from a GCS bucket."""
     logging.info(f"Reading email '{file_name}' from bucket '{bucket_name}'.")
     try:
-        storage_client = storage.Client()
+        storage_client = storage.Client(project=bucket_name)
         bucket = storage_client.get_bucket(bucket_name)
         blob = bucket.blob(file_name)
         email_content = blob.download_as_text()

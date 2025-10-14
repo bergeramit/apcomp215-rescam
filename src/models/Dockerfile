@@ -28,7 +28,7 @@ USER app
 WORKDIR /app
 
 # Copy the pyproject.toml for uv sync to download all necessary dependencies
-COPY --chown=app:app pyproject.toml .
+COPY --chown=app:app src/models/pyproject.toml .
 
 # Install uv, create venv, and install requirements
 ENV PATH="/home/app/.local/bin:$PATH"
@@ -38,15 +38,15 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv sync
 ENV PATH="/home/app/.venv/bin:$PATH"
 
 # Copy the content of the local src directory to the working directory
-COPY --chown=app:app train_model.py .
-COPY --chown=app:app infer_model.py .
-COPY --chown=app:app model_rag.py .
+COPY --chown=app:app src/models/train_model.py .
+COPY --chown=app:app src/models/infer_model.py .
+COPY --chown=app:app src/models/model_rag.py .
 
 # Create the gcloud config directory
 RUN mkdir -p /home/app/.config/gcloud
 
 # Copy Google Cloud credentials
-COPY --chown=app:app ../../secrets/application_default_credentials.json /home/app/.config/gcloud/
+COPY --chown=app:app secrets/application_default_credentials.json /home/app/.config/gcloud/
 
 # Set environment variable for Google Application Credentials
 ENV GOOGLE_APPLICATION_CREDENTIALS="/home/app/.config/gcloud/application_default_credentials.json"
