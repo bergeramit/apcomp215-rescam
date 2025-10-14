@@ -147,7 +147,7 @@ def read_email_from_gcs(bucket_name: str, file_name: str) -> str:
     logging.info(f"Reading email '{file_name}' from bucket '{bucket_name}'.")
     try:
         storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name)
+        bucket = storage_client.get_bucket(bucket_name)
         blob = bucket.blob(file_name)
         email_content = blob.download_as_text()
         return email_content
@@ -179,6 +179,7 @@ def classify_email_with_rag(
     vertexai.init(project=project_id, location=location)
 
     # 2. Read email content from GCS
+    # TODO: fix this
     email_content = read_email_from_gcs(gcs_bucket_name, gcs_file_name)
 
     # 3. Configure the RAG tool
@@ -217,21 +218,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rag_corpus_id", required=True, help="The ID of your Vertex AI RAGCorpus."
     )
-    parser.add_argument(
-        "--bucket", required=True, help="The GCS bucket where the email is located."
-    )
-    parser.add_argument(
-        "--file", required=True, help="The name of the email file in the GCS bucket."
-    )
-
     args = parser.parse_args()
 
+    # Adjust the function call accordingly.
     result = classify_email_with_rag(
         project_id=args.project_id,
         location=args.location,
         rag_corpus_id=args.rag_corpus_id,
-        gcs_bucket_name=args.bucket,
-        gcs_file_name=args.file,
+        gcs_bucket_name="rescam-dataset-bucket",
+        gcs_file_name="example_last_email.txt",
     )
 
     print(f"\nThe email '{args.file}' is classified as: {result}")
