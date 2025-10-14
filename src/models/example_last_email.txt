@@ -9,7 +9,7 @@ Hello Valued Customer,
 We attempted to process a payment on your account but it failed. To avoid suspension of your account within 24 hours, please verify your account and recent transactions immediately.
 
 Click the secure link below to confirm your details and restore full access:
-https://[REMOVED]-verify.example/confirm
+https://g00gle-verify.example/confirm
 
 Transaction ID: 9A7-XX-5543
 If you do not verify within 24 hours, your account will be suspended and you may lose access to your funds.

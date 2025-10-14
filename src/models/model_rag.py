@@ -1,8 +1,13 @@
-{{ ... }}
+"""
+Running with this command:
+python3 model_rag.py --project_id 1097076476714 --index_endpoint_id 3044332193032699904 --deployed_index_id phishing_emails_deployed_1760372787396
+"""
+import argparse
+import logging
 import pandas as pd
 import sentence_transformers
 from google.cloud import aiplatform, storage
-from vertexai.generative_models import GenerativeModel
+import google.generativeai as genai
 
 logging.basicConfig(level=logging.INFO)
 
@@ -66,7 +71,7 @@ Consider:
 Return **only** a single JSON object in the following structure:
 
 ```json
-{
+{{
   "classification": "benign | spam | scam | suspicious",
   "confidence": 0.0,
   "primary_reason": "≤40 words summarizing the decisive signals",
@@ -87,16 +92,16 @@ Return **only** a single JSON object in the following structure:
     "rag_empty"
   ],
   "evidence": [
-    {
+    {{
       "source": "current_email",
       "quote": "short quote…"
-    },
-    {
+    }},
+    {{
       "source": "rag",
       "quote": "short quote or match summary…"
-    }
+    }}
   ],
-  "parsed": {
+  "parsed": {{
     "sender_display": "…",
     "sender_email": "…",
     "from_domain": "…",
@@ -104,9 +109,9 @@ Return **only** a single JSON object in the following structure:
     "links": ["list of extracted domains/URLs if any"],
     "attachments": ["names/extensions if any"],
     "headers_used": true
-  },
+  }},
   "recommended_action": "allow | quarantine | warn_user | block_sender | report_phishing"
-}
+}}
 ```
 
 ---
@@ -228,9 +233,10 @@ def classify_email_with_rag(
     Returns:
         The classification result as a JSON string.
     """
-    # 1. Initialize Vertex AI
+    # 1. Initialize Vertex AI for RAG (keep us-east1 for Vector Search)
     logging.info(f"Initializing Vertex AI for project '{project_id}' in '{location}'.")
-    vertexai.init(project=project_id, location=location)
+    # Note: We don't use vertexai for the generative model, only for Vector Search
+    # vertexai.init(project=project_id, location=location)
 
     # 2. Read email content from GCS
     email_content = read_email_from_gcs(gcs_bucket_name, gcs_file_name)
@@ -244,15 +250,16 @@ def classify_email_with_rag(
         deployed_index_id=deployed_index_id,
     )
 
-    # 4. Load the generative model
-    model = GenerativeModel("gemini-1.5-flash-001")
+    # 4. Configure Gemini API with API key
+    genai.configure(api_key="AIzaSyAKCuagqJYUiUjdo2gmFhw5V6qjZMbQEJQ")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite-preview-09-2025")
 
     # 5. Construct the prompt and generate content
     prompt = INSTRUCTION_PROMPT.format(
         email_content=email_content, rag_context=rag_context
     )
 
-    logging.info("Sending request to the generative model...")
+    logging.info("Sending request to the Gemini API...")
     response = model.generate_content(prompt)
 
     classification = response.text.strip()
@@ -265,18 +272,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Classify an email using a vector-search-based RAG model."
     )
-    parser.add_argument("--project_id", required=True, help="Your Google Cloud project ID.")
+    parser.add_argument("--project_id", default="1097076476714", help="Your Google Cloud project ID.")
     parser.add_argument(
         "--location",
         default="us-east1",
         help="The GCP region for your resources (e.g., 'us-east1').",
     )
     parser.add_argument(
-        "--index_endpoint_id", required=True, help="The ID of your Vertex AI Index Endpoint."
+        "--index_endpoint_id",
+        default="3044332193032699904",
+        help="The ID of your Vertex AI Index Endpoint."
     )
     parser.add_argument(
         "--deployed_index_id",
-        required=True,
+        default="phishing_emails_deployed_1760372787396",
         help="The ID of the deployed index on the endpoint.",
     )
     parser.add_argument(
