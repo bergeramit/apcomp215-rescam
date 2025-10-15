@@ -1,0 +1,14 @@
+# Local test data
+user_emails/
+raw-datasets/
+processed-dataset/
+local_embeddings.parquet
+embeddings_for_vertex_ai.jsonl
+email_metadata.parquet
+
+# Model cache
+.cache/
+
+# ChromaDB (if testing locally)
+chroma_db/
+

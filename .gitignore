@@ -112,3 +112,4 @@ src/datapipeline/raw-datasets/*
 src/datapipeline/processed-dataset/*
 .DS_Store
 src/datapipeline/secrets/*
+secrets/application_default_credentials.json
