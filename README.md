@@ -1,15 +1,6 @@
 # Rescam App
 
-For APCOMP215 MLOPS Course - HW 1 - Amit Berger
+For APCOMP215 MLOPS Course - MS 2 - Amit Berger and Harry Price
 
-## Clean Data Pipeline
+Follow the Docker-shell.sh for easy deployments
 
-### Building the docker image
-```
-docker build -t preprocess-app .
-```
-
-### Accessing the docker container
-```
-docker run -it --rm preprocess-app
-```
