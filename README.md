@@ -5,7 +5,7 @@
 ./docket-shell.sh
 
 # Access Docker Shell
-docker run -it --rm preprocess-app
+docker run -it --rm preprocess-data
 
 
 # In the container
@@ -23,7 +23,7 @@ python preprocess_rag.py
 ./docket-shell.sh
 
 # Access Docker Shell
-docker run -it --rm regression-app
+docker run -it --rm ml-model
 
 # In the container -> all default values are targeted to match Rescam
 python model_rag.py
