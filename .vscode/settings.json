@@ -1,0 +1,9 @@
+{
+  "terminal.integrated.profiles.osx": {
+    "Warp": {
+      "path": "/Applications/Warp.app/Contents/Resources/warp-terminal",
+      "args": []
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "Warp"
+}
