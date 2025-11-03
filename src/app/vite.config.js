@@ -8,7 +8,14 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:5050',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.url.includes('/emails/stream')) {
+              proxyReq.setHeader('X-Accel-Buffering', 'no')
+            }
+          })
+        }
       }
     }
   }

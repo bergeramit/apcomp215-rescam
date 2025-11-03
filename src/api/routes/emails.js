@@ -51,6 +51,17 @@ export function streamEmails(req, res) {
       }
     }
   })
+  
+  res.on('error', () => {
+    // Clean up on error
+    const clients = sseClients.get(userEmail)
+    if (clients) {
+      const index = clients.indexOf(res)
+      if (index > -1) {
+        clients.splice(index, 1)
+      }
+    }
+  })
 }
 
 export function notifyEmailUpdate(userEmail, emailData, type = 'new_email') {

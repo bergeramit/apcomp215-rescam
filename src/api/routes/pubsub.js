@@ -107,6 +107,22 @@ async function processGmailNotification(userEmail, notificationHistoryId, access
         const metadata = extractGmailMetadata(message)
         console.log(`[ERROR] Email parsed - Subject: ${metadata.subject}, From: ${metadata.sender}`)
         
+        // Extract body text for early notification
+        const bodyText = extractBodyText(message)
+        
+        // Send early notification via SSE (before classification)
+        const earlyEmailData = {
+          id: messageId,
+          threadId: message.threadId || '',
+          receivedAt: new Date(parseInt(message.internalDate)).toISOString(),
+          sender: metadata.sender,
+          subject: metadata.subject,
+          snippet: message.snippet || '',
+          body: bodyText,
+          timestamp: new Date().toISOString()
+        }
+        notifyEmailUpdate(userEmail, earlyEmailData, 'new_email')
+        
         // Classify email
         console.log(`[ERROR] Starting classification for message ${messageId}`)
         const classification = await classifyEmail(emailContent, userEmail, messageId)
@@ -180,5 +196,23 @@ function extractGmailMetadata(message) {
     subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
     date: headers.find(h => h.name === 'Date')?.value || ''
   }
+}
+
+function extractBodyText(message) {
+  const payload = message.payload || {}
+  let body = ''
+  
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        body = Buffer.from(part.body.data, 'base64').toString('utf-8')
+        break
+      }
+    }
+  } else if (payload.body?.data) {
+    body = Buffer.from(payload.body.data, 'base64').toString('utf-8')
+  }
+  
+  return body
 }
 
