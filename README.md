@@ -11,6 +11,7 @@ Rescam is a phishing email detection system that uses Retrieval-Augmented Genera
 - [Docker Setup](#docker-setup)
 - [Usage Instructions](#usage-instructions)
 - [Project Structure](#project-structure)
+- [Web App](#web-app)
 
 ## 🏗️ Architecture Overview
 
@@ -462,3 +463,39 @@ For detailed cost breakdown, see `src/datapipeline/VERTEX_AI_SETUP.md`.
 - Rebuild containers: `docker-compose build --no-cache`
 
 For more troubleshooting tips, see `src/datapipeline/VERTEX_AI_SETUP.md`.
+
+## Web App
+
+To run everyting make sure you got:
+```
+secrets/application_default_credentials.json
+secrets/client_secret_1097076476714-9iaegt01febhsqh14niv8m2sjl8q07n7.apps.googleusercontent.com.json
+
+# Same .env -> see SETUP_GUIDE
+.env
+src/app/.env
+src/api/.env
+```
+
+Then in terminal run:
+```
+ngrok http 5050
+```
+Copy the URL ngrok provided and run this in terminal (with example url):
+```
+gcloud pubsub subscriptions create gmail-notifications-push \
+     --topic=gmail-notifications \
+     --push-endpoint=https://prewireless-malaceous-earlie.ngrok-free.dev \
+     --project=articulate-fort-472520-p2
+```
+
+In a different terminal
+```
+docker-compose up --build
+```
+
+Then navigate to http://localhost:3000/
+- sign in with google
+- start watch (pub/sub)
+- send email to yourself
+- View it in dashboard

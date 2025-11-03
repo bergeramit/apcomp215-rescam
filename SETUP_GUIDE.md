@@ -61,11 +61,13 @@ gcloud pubsub subscriptions create gmail-notifications-push \
   --push-endpoint=<YOUR_PUBLIC_WEBHOOK_URL> \
   --project=$PROJECT_ID
 
+Example:
+`
 gcloud pubsub subscriptions create gmail-notifications-push \
      --topic=gmail-notifications \
      --push-endpoint=https://prewireless-malaceous-earlie.ngrok-free.dev \
      --project=articulate-fort-472520-p2
-
+`
 # Or use the setup script:
 # 1. Start ngrok: ngrok http 5050
 # 2. Run: ./setup-pubsub-push.sh https://your-ngrok-url.ngrok.io/api/pubsub/webhook
