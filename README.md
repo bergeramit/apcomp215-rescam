@@ -521,11 +521,13 @@ Finally -> send an email to amitberger02@gmail.com
 
 ## Setup the infer docker:
 
+Goal of this docker: listen for Firestore changes -> get the Eventarc response and get the actual email stored -> call gemini with RAG and infer what is the classidication of this, then store back to GCS at rescam-user-emails/user-classifications/amitberger02@gmail.com/emails.json
+
 ```
 # Build the container
 docker build -t firestore-event-handler -f src/models/Dockerfile .
 
-# Run the container -> listen for Firestore changes -> get the Eventarc response and get the actual email stored -> TODO: infer and store back
+# Run the container
 docker run -d \                                                   
   --name firestore-handler-test \
   -p 8080:8080 \
@@ -537,6 +539,11 @@ docker run -d \
 
 # Track the logs
 docker logs -f firestore-handler-test
+```
+
+Or this oneliner:
+```
+docker build -t firestore-event-handler -f src/models/Dockerfile . && docker run --rm -p 8080:8080 -v $(pwd)/secrets:/home/app/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json -e GCP_PROJECT_ID=articulate-fort-472520-p2 -e PORT=8080 firestore-event-handler
 ```
 
 To test this:
