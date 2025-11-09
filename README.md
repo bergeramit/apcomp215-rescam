@@ -499,3 +499,47 @@ Then navigate to http://localhost:3000/
 - start watch (pub/sub)
 - send email to yourself
 - View it in dashboard
+
+
+
+# Working on email pipeline
+
+## Setup the sso + pub/sub for incoming emails
+```
+# Run both the api and the frontend containers
+docker-compose up --build
+```
+Then open the local browser on:
+```
+localhost:3000
+```
+
+Log in with amitberger02@gmail.com (test user)
+Then click the "Watch" button.
+Finally -> send an email to amitberger02@gmail.com
+
+
+## Setup the infer docker:
+
+```
+# Build the container
+docker build -t firestore-event-handler -f src/models/Dockerfile .
+
+# Run the container -> listen for Firestore changes -> get the Eventarc response and get the actual email stored -> TODO: infer and store back
+docker run -d \                                                   
+  --name firestore-handler-test \
+  -p 8080:8080 \
+  -v $(pwd)/secrets:/home/app/.config/gcloud:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json \
+  -e GCP_PROJECT_ID=articulate-fort-472520-p2 \
+  -e PORT=8080 \
+  firestore-event-handler
+
+# Track the logs
+docker logs -f firestore-handler-test
+```
+
+To test this:
+```
+./src/models/test_incoming_email.sh
+```

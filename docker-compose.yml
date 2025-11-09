@@ -50,12 +50,14 @@ services:
   #   build:
   #     context: .
   #     dockerfile: ./src/models/Dockerfile
-  #   image: ml-model
-  #   container_name: ml-model
+  #   image: firestore-event-handler
+  #   container_name: firestore-event-handler
+  #   ports:
+  #     - "8080:8080"
   #   volumes:
   #     - ./secrets:/home/app/.config/gcloud:ro
   #   environment:
   #     - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
-  #     - PYTHONUNBUFFERED=1
-  #   command: ["-c", "source /home/app/.venv/bin/activate && python model_rag.py --project_id 1097076476714 --index_endpoint_id 3044332193032699904 --deployed_index_id phishing_emails_deployed_1760372787396"]
-
+  #     - GCP_PROJECT_ID=articulate-fort-472520-p2
+  #     - PORT=8080
+  #   command: ["-c", "source /home/app/.venv/bin/activate && python firestore_event_handler.py"]

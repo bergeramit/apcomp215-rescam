@@ -41,6 +41,7 @@ ENV PATH="/home/app/.venv/bin:$PATH"
 COPY --chown=app:app src/models/train_model.py .
 COPY --chown=app:app src/models/infer_model.py .
 COPY --chown=app:app src/models/model_rag.py .
+COPY --chown=app:app src/models/firestore_event_handler.py .
 
 # Create the gcloud config directory (volume mount will provide credentials)
 RUN mkdir -p /home/app/.config/gcloud
@@ -49,6 +50,9 @@ RUN mkdir -p /home/app/.config/gcloud
 # Set environment variable for Google Application Credentials (will be overridden by docker-compose)
 ENV GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
 
-# Set the entrypoint and default command
-ENTRYPOINT ["/bin/bash"]
-CMD ["-c", "source /home/app/.venv/bin/activate && /bin/bash"]
+# Set PORT for Cloud Run (defaults to 8080)
+ENV PORT=8080
+
+# Set the entrypoint and default command to run FastAPI server
+# For Cloud Run, use uvicorn directly
+CMD ["/home/app/.venv/bin/uvicorn", "firestore_event_handler:app", "--host", "0.0.0.0", "--port", "8080"]

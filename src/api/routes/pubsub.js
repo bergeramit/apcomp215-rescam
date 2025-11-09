@@ -4,6 +4,7 @@ import { getGmailClient, getMessagesSinceHistoryId, getMessage } from '../servic
 import { classifyEmail } from '../services/modelService.js'
 import { saveEmailClassification } from '../services/gcsService.js'
 import { getStoredToken, getLastHistoryId, storeLastHistoryId } from '../services/tokenStore.js'
+import { storeEmailInFirestore } from '../services/firestoreService.js'
 
 const pubsub = new PubSub({
   projectId: process.env.GCP_PROJECT_ID
@@ -101,6 +102,9 @@ async function processGmailNotification(userEmail, notificationHistoryId, access
         // Fetch full message
         const message = await getMessage(gmail, messageId)
         console.log(`[ERROR] Message ${messageId} fetched successfully`)
+        
+        // Store raw email in Firestore
+        await storeEmailInFirestore(userEmail, message, messageId)
         
         // Parse email content
         const emailContent = parseGmailMessage(message)
