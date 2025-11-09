@@ -4,9 +4,10 @@ python3 model_rag.py --project_id 1097076476714 --index_endpoint_id 304433219303
 """
 import argparse
 import logging
+import os
 import pandas as pd
-import sentence_transformers
 from google.cloud import aiplatform, storage
+from vertexai.language_models import TextEmbeddingModel
 import google.generativeai as genai
 
 logging.basicConfig(level=logging.INFO)
@@ -159,9 +160,12 @@ def fetch_rag_context(
     logging.info("Fetching RAG context from Vertex AI Vector Search...")
     aiplatform.init(project=project_id, location=location)
 
-    # Load embedding model
-    model = sentence_transformers.SentenceTransformer("all-MiniLM-L6-v2")
-    query_embedding = model.encode([query_text], convert_to_numpy=True)[0]
+    # Use Vertex AI Text Embedding API instead of sentence-transformers
+    # This eliminates the need for PyTorch and local model downloads
+    model = TextEmbeddingModel.from_pretrained("textembedding-gecko@003")
+    embeddings = model.get_embeddings([query_text])
+    # embeddings[0].values returns a list of floats, which is what we need
+    query_embedding = list(embeddings[0].values)
 
     # Query the index
     index_endpoint_name = f"projects/{project_id}/locations/{location}/indexEndpoints/{index_endpoint_id}"
@@ -169,7 +173,7 @@ def fetch_rag_context(
 
     response = endpoint.find_neighbors(
         deployed_index_id=deployed_index_id,
-        queries=[query_embedding.tolist()],
+        queries=[query_embedding],  # Already a list, no need for .tolist()
         num_neighbors=num_neighbors,
     )
 
@@ -242,16 +246,27 @@ def classify_email_with_rag(
     email_content = read_email_from_gcs(gcs_bucket_name, gcs_file_name)
 
     # 3. Fetch RAG context from Vector Search
-    rag_context = fetch_rag_context(
-        query_text=email_content,
-        project_id=project_id,
-        location=location,
-        index_endpoint_id=index_endpoint_id,
-        deployed_index_id=deployed_index_id,
-    )
+    
+    
+    #TODO: Harry => we need a new RAG without sentence-transformers
+    
+    # rag_context = fetch_rag_context(
+    #     query_text=email_content,
+    #     project_id=project_id,
+    #     location=location,
+    #     index_endpoint_id=index_endpoint_id,
+    #     deployed_index_id=deployed_index_id,
+    # )
+    rag_context = ""
 
-    # 4. Configure Gemini API with API key
-    genai.configure(api_key="AIzaSyAKCuagqJYUiUjdo2gmFhw5V6qjZMbQEJQ")
+    # 4. Configure Gemini API with API key from environment variable
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GEMINI_API_KEY environment variable is not set. "
+            "Please set it with your Google Gemini API key."
+        )
+    genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-2.5-flash-lite-preview-09-2025")
 
     # 5. Construct the prompt and generate content

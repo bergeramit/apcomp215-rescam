@@ -1,5 +1,5 @@
 # Use the specified base image
-FROM python:3.12-slim-bookworm
+FROM --platform=linux/amd64 python:3.12-slim
 
 # Python wants UTF-8 locale
 ENV LANG=C.UTF-8
@@ -46,13 +46,10 @@ COPY --chown=app:app src/models/firestore_event_handler.py .
 # Create the gcloud config directory (volume mount will provide credentials)
 RUN mkdir -p /home/app/.config/gcloud
 
-# Note: Credentials are provided via volume mount in docker-compose.yml
-# Set environment variable for Google Application Credentials (will be overridden by docker-compose)
-ENV GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
-
-# Set PORT for Cloud Run (defaults to 8080)
+# Set PORT for Cloud Run (defaults to 8080, but Cloud Run will override this)
 ENV PORT=8080
 
 # Set the entrypoint and default command to run FastAPI server
-# For Cloud Run, use uvicorn directly
-CMD ["/home/app/.venv/bin/uvicorn", "firestore_event_handler:app", "--host", "0.0.0.0", "--port", "8080"]
+# For Cloud Run, use uvicorn with PORT from environment variable
+# Cloud Run sets PORT dynamically, so we need to use shell to read it
+CMD ["sh", "-c", "/home/app/.venv/bin/uvicorn firestore_event_handler:app --host 0.0.0.0 --port ${PORT:-8080}"]
