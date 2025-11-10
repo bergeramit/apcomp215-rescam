@@ -17,4 +17,6 @@ dependencies = [
     "vertexai>=1.71.1",
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
+    "functions-framework>=3.8.3",
+    "cloudevents>=1.12.0",
 ]

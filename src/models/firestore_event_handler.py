@@ -5,11 +5,13 @@ import os
 import json
 import logging
 import base64
-from typing import Dict, Any, Tuple
+import re
+from typing import Dict, Any, Tuple, Optional
 from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from google.cloud import firestore, storage
+from protobuf_schema.firestore_message_pb2 import DocumentEventData
 from model_rag import classify_email_with_rag
 
 logging.basicConfig(level=logging.INFO)
@@ -35,12 +37,120 @@ db = firestore.Client(project=PROJECT_ID, database=DATABASE_ID)
 storage_client = storage.Client(project=PROJECT_ID)
 
 
-def parse_firestore_event(event_data: Dict[str, Any]) -> Dict[str, Any]:
+def parse_protobuf_document(protobuf_data: bytes) -> Optional[Dict[str, Any]]:
+    """
+    Parse a Firestore DocumentEventData protobuf message to extract document information.
+
+    Args:
+        protobuf_data: Raw protobuf bytes representing a Firestore DocumentEventData
+
+    Returns:
+        Dictionary with document_id, collection, full_path, fields, etc. or None if parsing fails
+    """
+    try:
+        # Parse the protobuf as a DocumentEventData
+        event_data = DocumentEventData()
+        event_data.ParseFromString(protobuf_data)
+
+        # Get the document from the 'value' field (the new/current document state)
+        if not event_data.HasField('value'):
+            logger.warning("DocumentEventData has no 'value' field")
+            return None
+
+        document = event_data.value
+
+        # Extract document path
+        # Format: projects/{project}/databases/{database}/documents/{collection}/{doc_id}
+        doc_path = document.name
+        if not doc_path or '/documents/' not in doc_path:
+            logger.warning(f"Invalid document path in protobuf: {doc_path}")
+            return None
+
+        # Parse the document path
+        parts = doc_path.split('/documents/')
+        if len(parts) < 2:
+            logger.warning(f"Could not parse document path: {doc_path}")
+            return None
+
+        collection_and_doc = parts[1]
+        path_parts = collection_and_doc.split('/')
+        if len(path_parts) < 2:
+            logger.warning(f"Could not extract collection and doc_id from: {collection_and_doc}")
+            return None
+
+        collection = path_parts[0]
+        doc_id = path_parts[1]
+
+        # Convert protobuf fields to Python dict
+        fields_dict = {}
+        for field_name, value in document.fields.items():
+            fields_dict[field_name] = _convert_protobuf_value(value)
+
+        return {
+            'document_id': doc_id,
+            'collection': collection,
+            'full_path': doc_path,
+            'fields': fields_dict,
+            'create_time': document.create_time.seconds if document.create_time else None,
+            'update_time': document.update_time.seconds if document.update_time else None
+        }
+    except Exception as e:
+        logger.error(f"Error parsing protobuf document: {e}", exc_info=True)
+        return None
+
+
+def _convert_protobuf_value(value) -> Any:
+    """
+    Convert a Firestore protobuf Value to a Python native type.
+
+    Args:
+        value: A Firestore Value protobuf object
+
+    Returns:
+        Python native value (dict, list, str, int, float, bool, None, bytes)
+    """
+    # Check which value type is set
+    if value.HasField('null_value'):
+        return None
+    elif value.HasField('boolean_value'):
+        return value.boolean_value
+    elif value.HasField('integer_value'):
+        return value.integer_value
+    elif value.HasField('double_value'):
+        return value.double_value
+    elif value.HasField('timestamp_value'):
+        # Return as ISO format string
+        ts = value.timestamp_value
+        dt = datetime.fromtimestamp(ts.seconds + ts.nanos / 1e9)
+        return dt.isoformat() + 'Z'
+    elif value.HasField('string_value'):
+        return value.string_value
+    elif value.HasField('bytes_value'):
+        return value.bytes_value
+    elif value.HasField('reference_value'):
+        return value.reference_value
+    elif value.HasField('geo_point_value'):
+        gp = value.geo_point_value
+        return {'latitude': gp.latitude, 'longitude': gp.longitude}
+    elif value.HasField('array_value'):
+        return [_convert_protobuf_value(v) for v in value.array_value.values]
+    elif value.HasField('map_value'):
+        result = {}
+        for key, val in value.map_value.fields.items():
+            result[key] = _convert_protobuf_value(val)
+        return result
+    else:
+        logger.warning(f"Unknown value type in protobuf: {value}")
+        return None
+
+
+def parse_firestore_event(event_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Parse Eventarc Firestore event to extract document information.
     
     Eventarc sends CloudEvents in Pub/Sub binding format (CE_PUBSUB_BINDING).
     The event contains a 'message' field with base64-encoded CloudEvent data.
+    This function handles JSON format events.
     """
     import base64
     
@@ -270,105 +380,37 @@ async def handle_firestore_event(request: Request):
     try:
         # Get the content type to determine format
         content_type = request.headers.get("content-type", "").lower()
-        
+
         # Read the raw request body as bytes
         raw_body = await request.body()
-        
-        body = None
-        
-        # Try to parse as JSON first (most common case)
-        if "application/json" in content_type or not content_type:
+
+        logger.info(f"Received Firestore event - Content-Type: {content_type}, Body size: {len(raw_body)} bytes")
+
+        # Parse the event based on content type
+        event_info = None
+
+        if "application/protobuf" in content_type or "application/octet-stream" in content_type:
+            # Handle protobuf format
+            logger.info("Parsing event as protobuf format")
+            event_info = parse_protobuf_document(raw_body)
+        else:
+            # Handle JSON format (default)
+            logger.info("Parsing event as JSON format")
             try:
-                # Try to decode as UTF-8 and parse as JSON
-                body_text = raw_body.decode('utf-8')
-                if body_text.strip().startswith(('{', '[')):
-                    body = json.loads(body_text)
-                    logger.info(f"Parsed Eventarc event as JSON")
-            except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                logger.warning(f"Failed to parse as JSON: {e}, trying protobuf...")
-        
-        # If JSON parsing failed or content-type indicates protobuf, try protobuf
-        if body is None or "application/x-protobuf" in content_type or "application/octet-stream" in content_type:
-            try:
-                # Try to parse as protobuf using google.cloud.pubsub_v1
-                from google.cloud.pubsub_v1.types import PubsubMessage
-                from google.protobuf import json_format
-                
-                # Parse as Pub/Sub message protobuf
-                pubsub_message = PubsubMessage()
-                pubsub_message.ParseFromString(raw_body)
-                
-                # Convert protobuf message to dict
-                body = json_format.MessageToDict(pubsub_message)
-                logger.info(f"Parsed Eventarc event as protobuf (Pub/Sub message)")
-                
-                # If the message has data, it might be base64-encoded CloudEvent
-                if 'data' in body and isinstance(body['data'], str):
-                    # The data field in Pub/Sub messages is base64-encoded bytes
-                    try:
-                        decoded_data = base64.b64decode(body['data']).decode('utf-8')
-                        # Try to parse as JSON CloudEvent
-                        cloud_event = json.loads(decoded_data)
-                        # Replace the data field with the decoded CloudEvent
-                        body = {'message': body}
-                        body['message']['data'] = decoded_data
-                        logger.info(f"Decoded base64-encoded CloudEvent from Pub/Sub message")
-                    except Exception as e:
-                        logger.warning(f"Could not decode Pub/Sub message data as JSON: {e}")
-            except ImportError as e:
-                logger.warning(f"Protobuf libraries not available: {e}, trying alternative parsing...")
-                # Try to handle as binary data that might contain JSON
-                try:
-                    # Sometimes the data is just binary-encoded JSON, try to find JSON-like patterns
-                    body_text = raw_body.decode('utf-8', errors='ignore')
-                    # Look for JSON-like content
-                    if '{' in body_text or '[' in body_text:
-                        body = json.loads(body_text)
-                        logger.info(f"Fallback: parsed binary data as JSON")
-                    else:
-                        raise ValueError("No JSON-like content found in binary data")
-                except Exception as e2:
-                    logger.error(f"All parsing attempts failed. Content-Type: {content_type}, Body length: {len(raw_body)}")
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": f"Could not parse request body. Content-Type: {content_type}. Error: {str(e2)}"}
-                    )
-            except Exception as e:
-                logger.error(f"Failed to parse as protobuf: {e}")
-                # Last resort: try to decode as UTF-8 and parse as JSON
-                try:
-                    body_text = raw_body.decode('utf-8', errors='ignore')
-                    if body_text.strip().startswith(('{', '[')):
-                        body = json.loads(body_text)
-                        logger.info(f"Fallback: parsed as JSON after protobuf failure")
-                    else:
-                        raise ValueError("Body does not appear to be JSON")
-                except Exception as e2:
-                    logger.error(f"All parsing attempts failed. Content-Type: {content_type}, Body length: {len(raw_body)}")
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": f"Could not parse request body. Content-Type: {content_type}. Error: {str(e2)}"}
-                    )
-        
-        if body is None:
-            logger.error(f"Could not parse request body. Content-Type: {content_type}")
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Could not parse request body"}
-            )
-        
-        logger.info(f"Received Eventarc event: {json.dumps(body, indent=2, default=str)}")
-        
-        # Parse the Firestore event
-        event_info = parse_firestore_event(body)
-        
+                event_data = json.loads(raw_body.decode('utf-8'))
+                event_info = parse_firestore_event(event_data)
+            except json.JSONDecodeError:
+                # Try protobuf as fallback
+                logger.info("JSON parsing failed, trying protobuf format")
+                event_info = parse_protobuf_document(raw_body)
+
         if not event_info:
-            logger.warning("Could not parse Firestore event from request")
+            logger.error("Failed to parse Firestore event from request")
             return JSONResponse(
                 status_code=400,
-                content={"error": "Invalid event format"}
+                content={"error": "Failed to parse Firestore event"}
             )
-        
+
         document_id = event_info['document_id']
         collection = event_info['collection']
         
