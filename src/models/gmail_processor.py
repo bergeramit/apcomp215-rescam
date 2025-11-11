@@ -140,3 +140,4 @@ def process_email_with_model(message_id, gmail_service, project_id='109707647671
         logging.error(f"Error processing email {message_id}: {e}")
         raise
 
+
