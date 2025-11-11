@@ -645,7 +645,7 @@ amitberger@Amits-MacBook-Pro AC215_rescam % docker manifest inspect gcr.io/artic
 Now we can run the Cloud Run deploment again
 
 ```bash
-# 4. Deploy on google run
+# 4. Deploy on google run a new revision
 gcloud run deploy firestore-event-handler \
   --image gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
   --platform managed \
@@ -664,3 +664,17 @@ docker tag firestore-event-handler gcr.io/articulate-fort-472520-p2/firestore-ev
 # 3. Push to GCR
 docker push gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
 ```
+
+### Protobuf support
+
+Messages from Firestore are in Protobuf format. No built in python support so had to do some magic
+I cloned the proto file from google's github and ran:
+```
+# Must be protobuf@29 to avoid problems with dependencies
+brew install protobuf@29
+
+# Run this to create the python protobuf object
+protoc --python_out=. ./protobuf_schema/firestore_message.proto
+```
+to create src/models/protobuf_schema/firestore_message_pb2.py
+Then used it in the code to parse the event and it worked out!

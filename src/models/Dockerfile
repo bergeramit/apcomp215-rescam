@@ -43,6 +43,10 @@ COPY --chown=app:app src/models/infer_model.py .
 COPY --chown=app:app src/models/model_rag.py .
 COPY --chown=app:app src/models/firestore_event_handler.py .
 
+RUN mkdir -p ./protobuf_schema
+COPY --chown=app:app src/models/protobuf_schema/firestore_message_pb2.py ./protobuf_schema/
+COPY --chown=app:app src/models/protobuf_schema/__init__.py ./protobuf_schema/
+
 # Create the gcloud config directory (volume mount will provide credentials)
 RUN mkdir -p /home/app/.config/gcloud
 
