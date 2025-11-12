@@ -27,6 +27,12 @@ export async function handlePubSubWebhook(req, res) {
     const userEmail = messageData.emailAddress
     const historyId = messageData.historyId
 
+    // Disregard messages with undefined user ID
+    if (!userEmail) {
+      // Acknowledge receipt to prevent Pub/Sub from retrying
+      return res.status(200).send()
+    }
+
     console.log(`[DEBUG] Pub/Sub webhook received for ${userEmail}, historyId: ${historyId}`)
 
     // Acknowledge receipt immediately
@@ -126,32 +132,6 @@ async function processGmailNotification(userEmail, notificationHistoryId, access
           timestamp: new Date().toISOString()
         }
         notifyEmailUpdate(userEmail, earlyEmailData, 'new_email')
-        
-        // Classify email
-        console.log(`[ERROR] Starting classification for message ${messageId}`)
-        const classification = await classifyEmail(emailContent, userEmail, messageId)
-        console.log(`[ERROR] Classification complete:`, JSON.stringify(classification))
-        
-        // Save to GCS
-        const emailData = {
-          id: messageId,
-          threadId: message.threadId || '',
-          receivedAt: new Date(parseInt(message.internalDate)).toISOString(),
-          sender: metadata.sender,
-          subject: metadata.subject,
-          snippet: message.snippet || '',
-          body: emailContent,
-          classification: classification,
-          processedAt: new Date().toISOString()
-        }
-        
-        console.log(`[ERROR] Saving email classification to GCS`)
-        await saveEmailClassification(userEmail, emailData)
-        console.log(`[ERROR] Email saved to GCS successfully`)
-        
-        // Notify frontend via SSE
-        notifyEmailUpdate(userEmail, emailData, 'new_email')
-        
         console.log(`[SUCCESS] Processed email ${messageId} for ${userEmail}`)
       } catch (error) {
         console.error(`[ERROR] Error processing message ${messageId}:`, error.message)
