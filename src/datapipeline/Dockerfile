@@ -55,11 +55,9 @@ RUN mkdir -p /home/app/.config/gcloud && \
     mkdir -p /home/app/.cache/huggingface && \
     chown -R app:app /home/app/.cache
 
-# Copy Google Cloud credentials
-COPY --chown=app:app secrets/application_default_credentials.json /home/app/.config/gcloud/
-
-# Set environment variable for Google Application Credentials
-ENV GOOGLE_APPLICATION_CREDENTIALS="/home/app/.config/gcloud/application_default_credentials.json"
+# Note: Credentials are provided via volume mount in docker-compose.yml
+# Set environment variable for Google Application Credentials (will be overridden by docker-compose)
+ENV GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
 
 # Set the entrypoint and default command
 ENTRYPOINT ["/bin/bash"]

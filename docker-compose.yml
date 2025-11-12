@@ -1,37 +1,64 @@
-version: '3.8'
-
 services:
-  datapipeline:
+  frontend:
     build:
-      context: ./src/datapipeline
+      context: ./src/app
       dockerfile: Dockerfile
-    image: preprocess-data
-    container_name: preprocess-data
-    volumes:
-      # Mount secrets directory (adjust path as needed)
-      - ./secrets:/home/app/.config/gcloud:ro
-      # Add any data directories you need here
-      # - ./data:/app/data:rw
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
-      - PYTHONUNBUFFERED=1
-    # Default command - runs preprocessing scripts sequentially
-    command: ["-c", "source /home/app/.venv/bin/activate && python preprocess_clean.py && python preprocess_rag.py"]
+    image: rescam-frontend
+    container_name: rescam-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
 
-  models:
+  api:
     build:
-      context: .
-      dockerfile: ./src/models/Dockerfile
-    image: ml-model
-    container_name: ml-model
+      context: ./src/api
+      dockerfile: Dockerfile
+    image: rescam-api
+    container_name: rescam-api
+    ports:
+      - "5050:5050"
     volumes:
-      # Mount secrets directory (adjust path as needed)
       - ./secrets:/home/app/.config/gcloud:ro
-      # Add any data directories you need here
-      # - ./data:/app/data:rw
+      - ./src/models:/app/models:ro
     environment:
+      - PORT=5050
       - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
-      - PYTHONUNBUFFERED=1
-    # Default command - runs model RAG classification
-    command: ["-c", "source /home/app/.venv/bin/activate && python model_rag.py --project_id 1097076476714 --index_endpoint_id 3044332193032699904 --deployed_index_id phishing_emails_deployed_1760372787396"]
+      - GCP_PROJECT_ID=articulate-fort-472520-p2
+      - GCS_BUCKET_NAME=rescam-dataset-bucket
+      - PUBSUB_TOPIC_NAME=gmail-notifications
+      - LOG_LEVEL=debug
+      - NODE_ENV=development
+      - DEBUG=*
+    env_file:
+      - ./src/api/.env
 
+  # datapipeline:
+  #   build:
+  #     context: ./src/datapipeline
+  #     dockerfile: Dockerfile
+  #   image: preprocess-data
+  #   container_name: preprocess-data
+  #   volumes:
+  #     - ./secrets:/home/app/.config/gcloud:ro
+  #   environment:
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
+  #     - PYTHONUNBUFFERED=1
+  #   command: ["-c", "source /home/app/.venv/bin/activate && python preprocess_clean.py && python preprocess_rag.py"]
+
+  # models:
+  #   build:
+  #     context: .
+  #     dockerfile: ./src/models/Dockerfile
+  #   image: firestore-event-handler
+  #   container_name: firestore-event-handler
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./secrets:/home/app/.config/gcloud:ro
+  #   environment:
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
+  #     - GCP_PROJECT_ID=articulate-fort-472520-p2
+  #     - PORT=8080
+  #     - GEMINI_API_KEY=$GEMINI_API_KEY
+  #   command: ["sh", "-c", "/home/app/.venv/bin/uvicorn firestore_event_handler:app --host 0.0.0.0 --port ${PORT:-8080}"]

@@ -11,6 +11,7 @@ Rescam is a phishing email detection system that uses Retrieval-Augmented Genera
 - [Docker Setup](#docker-setup)
 - [Usage Instructions](#usage-instructions)
 - [Project Structure](#project-structure)
+- [Web App](#web-app)
 
 ## 🏗️ Architecture Overview
 
@@ -369,36 +370,7 @@ docker-compose stop
 ## 📁 Project Structure
 
 ```
-AC215_rescam/
-├── docker-compose.yml              # Centralized Docker orchestration
-├── DOCKER_COMPOSE_GUIDE.md         # Detailed Docker Compose usage guide
-├── README.md                        # This file
-├── reports/
-│   └── Journal.md                  # Development journal
-├── src/
-│   ├── datapipeline/               # Data preprocessing and RAG index creation
-│   │   ├── Dockerfile
-│   │   ├── docker-shell.sh
-│   │   ├── pyproject.toml           # Dependencies
-│   │   ├── preprocess_clean.py      # Clean and unify raw datasets
-│   │   ├── preprocess_rag.py       # Create Vertex AI RAG index
-│   │   ├── query_vertex_ai.py      # Test RAG retrieval
-│   │   ├── dataloader.py           # GCS bucket helper
-│   │   ├── upload_fake_data.py     # Test data uploader
-│   │   ├── generate_fake_emails.py # Synthetic data generator
-│   │   ├── test_embeddings_local.py
-│   │   ├── VERTEX_AI_SETUP.md      # Detailed Vertex AI setup guide
-│   │   └── secrets/                # GCP credentials (git-ignored)
-│   │       └── application_default_credentials.json
-│   └── models/                      # Email classification models
-│       ├── Dockerfile
-│       ├── docker-shell.sh
-│       ├── pyproject.toml           # Dependencies
-│       ├── model_rag.py             # RAG-based email classifier
-│       ├── train_model.py           # Model training (if needed)
-│       ├── infer_model.py           # Inference utilities
-│       └── secrets/                 # GCP credentials (git-ignored)
-│           └── application_default_credentials.json
+
 ```
 
 ## 🔒 Security Notes
@@ -462,3 +434,220 @@ For detailed cost breakdown, see `src/datapipeline/VERTEX_AI_SETUP.md`.
 - Rebuild containers: `docker-compose build --no-cache`
 
 For more troubleshooting tips, see `src/datapipeline/VERTEX_AI_SETUP.md`.
+
+## Web App
+
+To run everyting make sure you got:
+```bash
+secrets/application_default_credentials.json
+secrets/client_secret_1097076476714-9iaegt01febhsqh14niv8m2sjl8q07n7.apps.googleusercontent.com.json
+
+# Same .env -> see SETUP_GUIDE
+.env
+src/app/.env
+src/api/.env
+```
+
+Then in terminal run:
+```bash
+ngrok http 5050
+```
+Copy the URL ngrok provided and run this in terminal (with example url):
+```bash
+gcloud pubsub subscriptions create gmail-notifications-push \
+     --topic=gmail-notifications \
+     --push-endpoint=https://prewireless-malaceous-earlie.ngrok-free.dev \
+     --project=articulate-fort-472520-p2
+```
+
+In a different terminal
+```bash
+docker-compose up --build
+```
+
+Then navigate to http://localhost:3000/
+- sign in with google
+- start watch (pub/sub)
+- send email to yourself
+- View it in dashboard
+
+
+
+# Working on email pipeline
+
+## Setup the sso + pub/sub for incoming emails
+```bash
+# Run both the api and the frontend containers
+docker-compose up --build
+```
+Then open the local browser on:
+```bash
+localhost:3000
+```
+
+Log in with amitberger02@gmail.com (test user)
+Then click the "Watch" button.
+Finally -> send an email to amitberger02@gmail.com
+
+
+## Setup the infer docker:
+
+Goal of this docker: listen for Firestore changes -> get the Eventarc response and get the actual email stored -> call gemini with RAG and infer what is the classidication of this, then store back to GCS at rescam-user-emails/user-classifications/amitberger02@gmail.com/emails.json
+
+This oneliner build+run:
+```bash
+docker build -t firestore-event-handler -f src/models/Dockerfile . && docker run --rm -p 8080:8080 -v $(pwd)/secrets:/home/app/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json -e GCP_PROJECT_ID=articulate-fort-472520-p2 -e PORT=8080 -e GEMINI_API_KEY=$GEMINI_API_KEY firestore-event-handler 
+```
+
+Or this
+```bash
+# Build the container
+docker build -t firestore-event-handler -f src/models/Dockerfile . 
+
+# Run the container
+docker run -d \                                                   
+  --name firestore-handler-test \
+  -p 8080:8080 \
+  -v $(pwd)/secrets:/home/app/.config/gcloud:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json \
+  -e GCP_PROJECT_ID=articulate-fort-472520-p2 \
+  -e PORT=8080 \
+  firestore-event-handler
+
+# Track the logs
+docker logs -f firestore-handler-test
+```
+
+
+To test this:
+```bash
+./src/tests/models/test_firestore_event.sh
+```
+
+### Pushing the docker to dockerhub to run from a contrainer
+
+```bash
+# 1. Authenticate Docker with GCR
+gcloud auth configure-docker
+
+
+# 2. Build with Tag and Push
+docker buildx build --platform linux/amd64 \
+  -t gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
+  -f src/models/Dockerfile \
+  --push .
+
+# 3. Deploy on google Cloud Run
+gcloud run deploy firestore-event-handler \
+  --image gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
+  --platform managed \
+  --region us-central1 \
+  --project articulate-fort-472520-p2 \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=articulate-fort-472520-p2
+```
+
+#### Fixing multi platform (only linux support) issue
+
+Problem:
+```bash
+amitberger@Amits-MacBook-Pro AC215_rescam % docker manifest inspect gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
+
+{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.oci.image.index.v1+json",
+   "manifests": [
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 2948,
+         "digest": "sha256:981c0624dab8a6ab87ead7ee02336cf657bc4fdb4c956eb2711b6fcce1861dcc",
+         "platform": {
+            "architecture": "arm64",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 566,
+         "digest": "sha256:567bf591392d2fa7555eab2e5e32c1272d49459a428c934fdc4e253c9706ce3e",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      }
+   ]
+}
+```
+We need to remove the second one and leave the arm linux entry intact.
+
+```bash
+# Create a new manifest with only the arm64 entry (this will overwrite the existing one)
+docker manifest create gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
+  gcr.io/articulate-fort-472520-p2/firestore-event-handler@sha256:981c0624dab8a6ab87ead7ee02336cf657bc4fdb4c956eb2711b6fcce1861dcc --amend
+
+# Annotate with the correct platform
+docker manifest annotate \
+  --os linux \
+  --arch amd64 \
+  gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
+  gcr.io/articulate-fort-472520-p2/firestore-event-handler@sha256:981c0624dab8a6ab87ead7ee02336cf657bc4fdb4c956eb2711b6fcce1861dcc
+
+# Push the updated manifest (this overwrites the remote manifest)
+docker manifest push gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
+
+# Finally check again:
+amitberger@Amits-MacBook-Pro AC215_rescam % docker manifest inspect gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
+{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.oci.image.index.v1+json",
+   "manifests": [
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 2948,
+         "digest": "sha256:981c0624dab8a6ab87ead7ee02336cf657bc4fdb4c956eb2711b6fcce1861dcc",
+         "platform": {
+            "architecture": "arm64",
+            "os": "linux",
+            "variant": "v8"
+         }
+      }
+   ]
+}
+```
+
+Now we can run the Cloud Run deploment again
+
+```bash
+# 4. Deploy on google run a new revision
+gcloud run deploy firestore-event-handler \
+  --image gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
+  --platform managed \
+  --region us-central1 \
+  --project articulate-fort-472520-p2 \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=articulate-fort-472520-p2
+```
+
+#### Explicit tage and pushes
+
+```bash
+# 2. Tag your image for GCR (replace REGION with us-central1, us-east1, etc.)
+docker tag firestore-event-handler gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
+
+# 3. Push to GCR
+docker push gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
+```
+
+### Protobuf support
+
+Messages from Firestore are in Protobuf format. No built in python support so had to do some magic
+I cloned the proto file from google's github and ran:
+```bash
+# Must be protobuf@29 to avoid problems with dependencies
+brew install protobuf@29
+
+# Run this to create the python protobuf object
+protoc --python_out=. ./protobuf_schema/firestore_message.proto
+```
+to create src/models/protobuf_schema/firestore_message_pb2.py
+Then used it in the code to parse the event and it worked out!

@@ -13,7 +13,7 @@ gcloud auth application-default login
 gcloud config set project 1097076476714 # --> Project ID
 gcloud auth application-default set-quota-project 1097076476714 # --> Project ID
 ```
-This created the files in [/Users/amitberger/.config/gcloud/application_default_credentials.json] and [/Users/amitberger/.config/gcloud/config.yaml]
+This created the files in [./secrets/application_default_credentials.json] and [/Users/amitberger/.config/gcloud/config.yaml]
 
 Find out that Parquet is the best format for storing data in this case, as it is the most compact and efficient format for storing data in a tabular format.
 
@@ -38,7 +38,7 @@ ENV GOOGLE_APPLICATION_CREDENTIALS="/home/app/service-account-key.json"
 Option 2: Use Environment Variables (Most secure for production)
 ```
 docker run -v ~/.config/gcloud:/home/app/.config/gcloud:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS="/home/app/.config/gcloud/application_default_credentials.json" \
+  -e GOOGLE_APPLICATION_CREDENTIALS="./secrets/application_default_credentials.json" \
   your-image-name
 ```
 Most secure: Use Google Cloud Run or Kubernetes with Workload Identity to avoid copying any credentials
