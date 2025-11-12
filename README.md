@@ -370,36 +370,7 @@ docker-compose stop
 ## 📁 Project Structure
 
 ```
-AC215_rescam/
-├── docker-compose.yml              # Centralized Docker orchestration
-├── DOCKER_COMPOSE_GUIDE.md         # Detailed Docker Compose usage guide
-├── README.md                        # This file
-├── reports/
-│   └── Journal.md                  # Development journal
-├── src/
-│   ├── datapipeline/               # Data preprocessing and RAG index creation
-│   │   ├── Dockerfile
-│   │   ├── docker-shell.sh
-│   │   ├── pyproject.toml           # Dependencies
-│   │   ├── preprocess_clean.py      # Clean and unify raw datasets
-│   │   ├── preprocess_rag.py       # Create Vertex AI RAG index
-│   │   ├── query_vertex_ai.py      # Test RAG retrieval
-│   │   ├── dataloader.py           # GCS bucket helper
-│   │   ├── upload_fake_data.py     # Test data uploader
-│   │   ├── generate_fake_emails.py # Synthetic data generator
-│   │   ├── test_embeddings_local.py
-│   │   ├── VERTEX_AI_SETUP.md      # Detailed Vertex AI setup guide
-│   │   └── secrets/                # GCP credentials (git-ignored)
-│   │       └── application_default_credentials.json
-│   └── models/                      # Email classification models
-│       ├── Dockerfile
-│       ├── docker-shell.sh
-│       ├── pyproject.toml           # Dependencies
-│       ├── model_rag.py             # RAG-based email classifier
-│       ├── train_model.py           # Model training (if needed)
-│       ├── infer_model.py           # Inference utilities
-│       └── secrets/                 # GCP credentials (git-ignored)
-│           └── application_default_credentials.json
+
 ```
 
 ## 🔒 Security Notes
@@ -467,7 +438,7 @@ For more troubleshooting tips, see `src/datapipeline/VERTEX_AI_SETUP.md`.
 ## Web App
 
 To run everyting make sure you got:
-```
+```bash
 secrets/application_default_credentials.json
 secrets/client_secret_1097076476714-9iaegt01febhsqh14niv8m2sjl8q07n7.apps.googleusercontent.com.json
 
@@ -478,11 +449,11 @@ src/api/.env
 ```
 
 Then in terminal run:
-```
+```bash
 ngrok http 5050
 ```
 Copy the URL ngrok provided and run this in terminal (with example url):
-```
+```bash
 gcloud pubsub subscriptions create gmail-notifications-push \
      --topic=gmail-notifications \
      --push-endpoint=https://prewireless-malaceous-earlie.ngrok-free.dev \
@@ -490,7 +461,7 @@ gcloud pubsub subscriptions create gmail-notifications-push \
 ```
 
 In a different terminal
-```
+```bash
 docker-compose up --build
 ```
 
@@ -523,6 +494,12 @@ Finally -> send an email to amitberger02@gmail.com
 
 Goal of this docker: listen for Firestore changes -> get the Eventarc response and get the actual email stored -> call gemini with RAG and infer what is the classidication of this, then store back to GCS at rescam-user-emails/user-classifications/amitberger02@gmail.com/emails.json
 
+This oneliner build+run:
+```bash
+docker build -t firestore-event-handler -f src/models/Dockerfile . && docker run --rm -p 8080:8080 -v $(pwd)/secrets:/home/app/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json -e GCP_PROJECT_ID=articulate-fort-472520-p2 -e PORT=8080 -e GEMINI_API_KEY=$GEMINI_API_KEY firestore-event-handler 
+```
+
+Or this
 ```bash
 # Build the container
 docker build -t firestore-event-handler -f src/models/Dockerfile . 
@@ -541,14 +518,10 @@ docker run -d \
 docker logs -f firestore-handler-test
 ```
 
-Or this oneliner:
-```bash
-docker build -t firestore-event-handler -f src/models/Dockerfile . && docker run --rm -p 8080:8080 -v $(pwd)/secrets:/home/app/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json -e GCP_PROJECT_ID=articulate-fort-472520-p2 -e PORT=8080 -e GEMINI_API_KEY=$GEMINI_API_KEY firestore-event-handler 
-```
 
 To test this:
 ```bash
-./src/models/test_incoming_email.sh
+./src/tests/models/test_firestore_event.sh
 ```
 
 ### Pushing the docker to dockerhub to run from a contrainer
@@ -564,7 +537,7 @@ docker buildx build --platform linux/amd64 \
   -f src/models/Dockerfile \
   --push .
 
-# 3. Deploy on google run
+# 3. Deploy on google Cloud Run
 gcloud run deploy firestore-event-handler \
   --image gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest \
   --platform managed \
@@ -669,7 +642,7 @@ docker push gcr.io/articulate-fort-472520-p2/firestore-event-handler:latest
 
 Messages from Firestore are in Protobuf format. No built in python support so had to do some magic
 I cloned the proto file from google's github and ran:
-```
+```bash
 # Must be protobuf@29 to avoid problems with dependencies
 brew install protobuf@29
 
