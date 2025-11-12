@@ -60,4 +60,5 @@ services:
   #     - GOOGLE_APPLICATION_CREDENTIALS=/home/app/.config/gcloud/application_default_credentials.json
   #     - GCP_PROJECT_ID=articulate-fort-472520-p2
   #     - PORT=8080
-  #   command: ["-c", "source /home/app/.venv/bin/activate && python firestore_event_handler.py"]
+  #     - GEMINI_API_KEY=$GEMINI_API_KEY
+  #   command: ["sh", "-c", "/home/app/.venv/bin/uvicorn firestore_event_handler:app --host 0.0.0.0 --port ${PORT:-8080}"]
